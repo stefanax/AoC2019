@@ -1,12 +1,14 @@
 //use std::env;
+use std::io;
 use std::fs;
+use std::env::current_dir;
 
 fn main() {
     //println!("Hello, world!");
     //let path = env::current_dir();
     //println!("Current dir: {:?}", path);
 
-    aoc_day_three_second();
+    aoc_day_five_first();
 }
 
 
@@ -320,4 +322,279 @@ fn aoc_day_three_second() {
     }
 
     println!("Shortest path: {}", minimum_distance);
+}
+
+
+fn aoc_day_four_tick(input: u32) -> u32 {
+    fn recurse(digits: &mut Vec<u32>, index: usize) {
+        if digits[index] == 10 {
+            digits[index-1] += 1;
+            if index > 0 {
+                recurse(digits, index-1);
+                digits[index] = digits[index-1];
+            }
+        }
+    }
+
+    let mut digits: Vec<u32> = input.to_string().chars().map(|d| d.to_digit(10).unwrap()).collect();  //Note: Not the prettiest way, but honestly stolen from the Internets...
+
+    digits[5] += 1;
+    recurse(&mut digits, 5);
+
+    //TODO: Make this pretty...
+    let temp: u32 = digits[0] * 100000 + digits[1] * 10000 + digits[2] * 1000 + digits[3] * 100 + digits[4] * 10 + digits[5];
+
+    return temp;
+}
+
+fn aoc_day_four_check_pairs(input: u32, index: usize) -> bool {
+    let digits: Vec<_> = input.to_string().chars().map(|d| d.to_digit(10).unwrap()).collect();
+
+    if index == 0 { return false; }
+
+    if digits[index] == digits[index-1] { return true; }
+
+    return aoc_day_four_check_pairs(digits[0] * 100000 + digits[1] * 10000 + digits[2] * 1000 + digits[3] * 100 + digits[4] * 10 + digits[5], index-1);
+}
+
+//TODO: Should perhaps just work with a Vec<u8> and not convert back-and-fourth? (Rethorical question...in prod code I would fix that)
+#[allow(dead_code)]
+fn aoc_day_four_first() {
+    let start: u32 = 136777; //Orig: 136760
+    let end: u32 = 595730;
+
+    let mut current = start;  //Lower one because we add one the first thing we do...
+    let mut found_matches_count = 0u16;
+
+    while current <= end {
+        if aoc_day_four_check_pairs(current, 5) {
+            found_matches_count += 1;
+            println!("Match: {}", current);
+        } else {
+            println!("No match: {}", current);
+        }
+
+        current = aoc_day_four_tick(current);  //TODO: Parse as reference?
+    }
+
+    println!("Amoount of possible passwords: {}", found_matches_count);
+}
+
+
+fn aoc_day_four_check_pairs_absolute(input: u32) -> bool {
+    let digits: Vec<_> = input.to_string().chars().map(|d| d.to_digit(10).unwrap()).collect();
+
+    if digits[0] == digits[1] && digits[1] != digits[2] { return true; }
+    if digits[0] != digits[1] && digits[1] == digits[2] && digits[2] != digits[3] { return true; }
+    if digits[1] != digits[2] && digits[2] == digits[3] && digits[3] != digits[4] { return true; }
+    if digits[2] != digits[3] && digits[3] == digits[4] && digits[4] != digits[5] { return true; }
+    if digits[3] != digits[4] && digits[4] == digits[5] { return true; }
+
+    return false;
+}
+
+
+//TODO: Should perhaps just work with a Vec<u8> and not convert back-and-fourth? (Rethorical question...in prod code I would fix that)
+#[allow(dead_code)]
+fn aoc_day_four_second() {
+    let start: u32 = 136777; //Orig: 136760
+    let end: u32 = 595730;
+
+    let mut current = start;  //Lower one because we add one the first thing we do...
+    let mut found_matches_count = 0u16;
+
+    while current <= end {
+        if aoc_day_four_check_pairs_absolute(current) {
+            found_matches_count += 1;
+            println!("Match: {}", current);
+        } else {
+            println!("No match: {}", current);
+        }
+
+        current = aoc_day_four_tick(current);  //TODO: Parse as reference?
+    }
+
+    println!("Amoount of possible passwords: {}", found_matches_count);
+}
+
+
+
+
+fn intcode_computer(program: &mut Vec<i32>) -> bool {
+    fn opcode_add(program: &mut Vec<i32>, program_pos: &mut usize) {
+        let param_mode_immediate_a: bool = (program[*program_pos] % 1000) - (program[*program_pos] % 100) == 100;
+        let param_mode_immediate_b: bool = (program[*program_pos] % 10000) - (program[*program_pos] % 1000) == 1000;
+        let param_mode_immediate_c: bool = (program[*program_pos] % 100000) - (program[*program_pos] % 10000) == 10000;
+
+        if param_mode_immediate_c {
+            // This should be invalid as we can't store a value to an Immediate Value
+            print_message_and_die("Can't store added values to Immediate Value!");
+        }
+
+        let value_a = if param_mode_immediate_a { program[*program_pos+1] } else { program[program[*program_pos+1] as usize] };
+        let value_b = if param_mode_immediate_b { program[*program_pos+2] } else { program[program[*program_pos+2] as usize] };
+        let store_pos: usize = program[*program_pos+3] as usize;
+        program[store_pos] = value_a + value_b;
+        *program_pos += 4;
+    }
+
+    fn opcode_multiply(program: &mut Vec<i32>, program_pos: &mut usize) {
+        let param_mode_immediate_a: bool = (program[*program_pos] % 1000) - (program[*program_pos] % 100) == 100;
+        let param_mode_immediate_b: bool = (program[*program_pos] % 10000) - (program[*program_pos] % 1000) == 1000;
+        let param_mode_immediate_c: bool = (program[*program_pos] % 100000) - (program[*program_pos] % 10000) == 10000;
+
+        if param_mode_immediate_c {
+            // This should be invalid as we can't store a value to an Immediate Value
+            print_message_and_die("Can't store added values to Immediate Value!");
+        }
+
+        let value_a = if param_mode_immediate_a { program[*program_pos+1] } else { program[program[*program_pos+1] as usize] };
+        let value_b = if param_mode_immediate_b { program[*program_pos+2] } else { program[program[*program_pos+2] as usize] };
+        let store_pos: usize = program[*program_pos+3] as usize;
+        program[store_pos] = value_a * value_b;
+        *program_pos += 4;
+    }
+
+    fn opcode_input(program: &mut Vec<i32>, program_pos: &mut usize) {
+        let mut input_number: i32 = 999999;
+
+        println!("Input: ");
+
+        let mut input = String::new();
+        match io::stdin().read_line(&mut input) {
+            Ok(_n) => {
+                let input_number_parse = input.trim().parse::<i32>();
+                match input_number_parse {
+                    Ok(v) => input_number = v,
+                    Err(e) => {println!("{}", e); print_message_and_die("Parsing STDIO input value failed")},
+                }
+            }
+            Err(_error) => print_message_and_die("Error reading input...")
+        }
+
+        let store_pos: usize = program[*program_pos+1] as usize;
+        program[store_pos] = input_number;
+        *program_pos += 2;
+    }
+
+    fn opcode_output(program: &mut Vec<i32>, program_pos: &mut usize) {
+        let param_mode_immediate_a: bool = (program[*program_pos] % 1000) - (program[*program_pos] % 100) == 100;
+        let output = if param_mode_immediate_a { program[*program_pos+1] } else { program[program[*program_pos+1] as usize] };
+
+        println!("Output: {}", output);
+        *program_pos += 2;
+    }
+
+    fn opcode_jump_if_true(program: &mut Vec<i32>, program_pos: &mut usize) {
+        let param_mode_immediate_a: bool = (program[*program_pos] % 1000) - (program[*program_pos] % 100) == 100;
+        let param_mode_immediate_b: bool = (program[*program_pos] % 10000) - (program[*program_pos] % 1000) == 1000;
+
+        let state_to_check = if param_mode_immediate_a { program[*program_pos+1] } else { program[program[*program_pos+1] as usize] };
+        let new_pos = if param_mode_immediate_b { program[*program_pos+2] } else { program[program[*program_pos+2] as usize] };
+
+        if state_to_check > 0 {
+            *program_pos = new_pos as usize;
+        } else {
+            *program_pos += 3;
+        }
+    }
+
+    fn opcode_jump_if_false(program: &mut Vec<i32>, program_pos: &mut usize) {
+        let param_mode_immediate_a: bool = (program[*program_pos] % 1000) - (program[*program_pos] % 100) == 100;
+        let param_mode_immediate_b: bool = (program[*program_pos] % 10000) - (program[*program_pos] % 1000) == 1000;
+
+        let state_to_check = if param_mode_immediate_a { program[*program_pos+1] } else { program[program[*program_pos+1] as usize] };
+        let new_pos = if param_mode_immediate_b { program[*program_pos+2] } else { program[program[*program_pos+2] as usize] };
+
+        if state_to_check == 0 {
+            *program_pos = new_pos as usize;
+        } else {
+            *program_pos += 3;
+        }
+    }
+
+    fn opcode_check_if_less(program: &mut Vec<i32>, program_pos: &mut usize) {
+        let param_mode_immediate_a: bool = (program[*program_pos] % 1000) - (program[*program_pos] % 100) == 100;
+        let param_mode_immediate_b: bool = (program[*program_pos] % 10000) - (program[*program_pos] % 1000) == 1000;
+        //let param_mode_immediate_c: bool = (program[*program_pos] % 100000) - (program[*program_pos] % 10000) == 10000;
+
+        let state_to_check_a = if param_mode_immediate_a { program[*program_pos+1] } else { program[program[*program_pos+1] as usize] };
+        let state_to_check_b = if param_mode_immediate_b { program[*program_pos+2] } else { program[program[*program_pos+2] as usize] };
+
+        let store_pos = program[*program_pos+3];
+
+        if state_to_check_a < state_to_check_b {
+            program[store_pos as usize] = 1;
+        } else {
+            program[store_pos as usize] = 0;
+        }
+        *program_pos += 4;
+    }
+
+    fn opcode_check_if_equal(program: &mut Vec<i32>, program_pos: &mut usize) {
+        let param_mode_immediate_a: bool = (program[*program_pos] % 1000) - (program[*program_pos] % 100) == 100;
+        let param_mode_immediate_b: bool = (program[*program_pos] % 10000) - (program[*program_pos] % 1000) == 1000;
+        //let param_mode_immediate_c: bool = (program[*program_pos] % 100000) - (program[*program_pos] % 10000) == 10000;
+
+        let state_to_check_a = if param_mode_immediate_a { program[*program_pos+1] } else { program[program[*program_pos+1] as usize] };
+        let state_to_check_b = if param_mode_immediate_b { program[*program_pos+2] } else { program[program[*program_pos+2] as usize] };
+
+        let store_pos = program[*program_pos+3];
+
+        if state_to_check_a == state_to_check_b {
+            program[store_pos as usize] = 1;
+        } else {
+            program[store_pos as usize] = 0;
+        }
+        *program_pos += 4;
+    }
+
+
+    let program_pos: &mut usize = &mut 0;
+
+    loop {
+        //println!("DEBUG - Pos: {}", *program_pos);
+        let opcode = program[*program_pos] % 100;
+
+        match opcode {
+            1 => opcode_add(program, program_pos),
+            2 => opcode_multiply(program, program_pos),
+            3 => opcode_input(program, program_pos),
+            4 => opcode_output(program, program_pos),
+            5 => opcode_jump_if_true(program, program_pos),
+            6 => opcode_jump_if_false(program, program_pos),
+            7 => opcode_check_if_less(program, program_pos),
+            8 => opcode_check_if_equal(program, program_pos),
+            99 => return true,
+            _ => return false,
+        }
+    }
+}
+
+
+
+//NOTE: This is also the second, as I don't need to extend anything here. Functions FTW!
+#[allow(dead_code)]
+fn aoc_day_five_first() {
+    let input_raw = fs::read_to_string("input_files/input_5.txt").expect("File read went poop-shaped");
+    let input_data:Vec<&str> = input_raw.split(",").collect();
+
+    let program: &mut Vec<i32> = &mut Vec::new();
+
+    //let mut counter = 0;
+    for value in input_data {
+        let value_int = value.parse::<i32>();
+        match value_int {
+            Ok(v) => program.push(v),
+            Err(_e) => print_message_and_die("Parsing input value failed"),
+        }
+        //counter += 1;
+    }
+
+
+
+    let result = intcode_computer(program);
+
+
+    println!("Did it work: {}", result);
 }
